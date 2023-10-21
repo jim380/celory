@@ -1,6 +1,6 @@
 {
-  "name": "celo-signature-checker",
-  "version": "0.1.0",
+  "name": "celory-v2",
+  "version": "0.2.0",
   "main": "index.js",
   "license": "MIT",
   "scripts": {
