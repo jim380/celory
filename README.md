@@ -3,14 +3,14 @@
 ### Build
 
 ```
-$ docker build -t csc:v0.1.0 .
+$ docker build -t celory:v0.2.0 .
 ```
 
 ### Run
 
 ```
-$ docker run --name csc -dt --restart unless-stopped -p 3000:3000 csc:v0.1.0
-$ docker logs csc  -f --since 1m
+$ docker run --name celory -dt --restart unless-stopped -p 3000:3000 celory:v0.2.0
+$ docker logs celory  -f --since 1m
 ```
 
 ### Endpoints
