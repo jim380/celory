@@ -1,2 +1,8 @@
 node_modules
+dist
+*.tsbuildinfo
+.vscode
+.DS_Store
 .env
+cache.lock
+out
