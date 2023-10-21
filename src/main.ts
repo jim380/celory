@@ -36,21 +36,21 @@ async function main() {
     const balanceChecker = new BalanceChecker(rpcUrl, walletAddresses, logger);
 
     function loop() {
-      const blockNumberPromise = web3.eth.getBlockNumber();
+      web3.eth
+        .getBlockNumber()
+        .then(async (blockNumber) => {
+          // signature
+          unsignedValidators = await signatureChecker.run(blockNumber);
 
-      blockNumberPromise.then(async (blockNumber) => {
-        // signature
-        unsignedValidators = await signatureChecker.run(blockNumber);
-
-        // balance
-        totalBalance = await balanceChecker.run();
-
-        setTimeout(loop, 3000);
-      });
-      blockNumberPromise.catch((error) => {
-        logger.error("Error getting block number:", error);
-        setTimeout(loop, 3000);
-      });
+          // balance
+          totalBalance = await balanceChecker.run();
+        })
+        .catch((error) => {
+          logger.error("Error getting block number:", error);
+        })
+        .finally(() => {
+          setTimeout(loop, 3000);
+        });
     }
 
     loop();
