@@ -2,7 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import Web3 from "web3";
 import winston from "winston";
-import { ValidatorSignatureChecker } from "./signature";
+import { SignatureChecker } from "./SignatureChecker";
 
 dotenv.config();
 
@@ -25,7 +25,7 @@ async function main() {
   let unsignedValidatorsAll: string[] = [];
 
   try {
-    const signatureChecker = new ValidatorSignatureChecker(
+    const signatureChecker = new SignatureChecker(
       rpcUrl,
       signerAddresses,
       logger

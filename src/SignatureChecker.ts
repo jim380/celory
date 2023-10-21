@@ -3,12 +3,12 @@ import { ContractKit, newKit } from "@celo/contractkit";
 import { bitIsSet, parseBlockExtraData } from "@celo/utils/lib/istanbul";
 import winston from "winston";
 
-export interface ValidatorSignatureResult {
+export interface SignatureCheckerResult {
   unsignedValidatorsMonitored: string[];
   unsignedValidatorsAll: string[];
 }
 
-export class ValidatorSignatureChecker {
+export class SignatureChecker {
   kit: ContractKit;
   web3: Web3;
   signerAddresses: string[];
@@ -25,7 +25,7 @@ export class ValidatorSignatureChecker {
     this.logger = logger;
   }
 
-  async run(blockNum: number): Promise<ValidatorSignatureResult> {
+  async run(blockNum: number): Promise<SignatureCheckerResult> {
     let unsignedValidatorsMonitored: string[] = [];
     let unsignedValidatorsAll: string[] = [];
 
@@ -80,7 +80,7 @@ export class ValidatorSignatureChecker {
       this.logger.info(`No unsigned validators at block ${blockNum}`);
     }
 
-    const result: ValidatorSignatureResult = {
+    const result: SignatureCheckerResult = {
       unsignedValidatorsMonitored,
       unsignedValidatorsAll,
     };
