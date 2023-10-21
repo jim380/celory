@@ -2,7 +2,8 @@ import express from "express";
 import dotenv from "dotenv";
 import Web3 from "web3";
 import winston from "winston";
-import { SignatureChecker } from "./SignatureChecker";
+import { SignatureChecker, SignatureCheckerResult } from "./SignatureChecker";
+import { BalanceChecker, BalanceCheckerResult } from "./BalanceChecker";
 
 dotenv.config();
 
@@ -17,12 +18,13 @@ const app = express();
 
 const rpcUrl = process.env.RPC_URL ?? "https://forno.celo.org";
 const signerAddresses = process.env.SIGNER_ADDRESSES?.split(",") || [];
+const walletAddresses = process.env.WALLET_ADDRESSES?.split(",") || [];
 
 async function main() {
   const web3 = new Web3(rpcUrl);
 
-  let unsignedValidatorsMonitored: string[] = [];
-  let unsignedValidatorsAll: string[] = [];
+  let totalBalance: BalanceCheckerResult;
+  let unsignedValidators: SignatureCheckerResult;
 
   try {
     const signatureChecker = new SignatureChecker(
@@ -31,13 +33,18 @@ async function main() {
       logger
     );
 
+    const balanceChecker = new BalanceChecker(rpcUrl, walletAddresses, logger);
+
     function loop() {
       const blockNumberPromise = web3.eth.getBlockNumber();
 
       blockNumberPromise.then(async (blockNumber) => {
-        const result = await signatureChecker.run(blockNumber);
-        unsignedValidatorsMonitored = result.unsignedValidatorsMonitored;
-        unsignedValidatorsAll = result.unsignedValidatorsAll;
+        // signature
+        unsignedValidators = await signatureChecker.run(blockNumber);
+
+        // balance
+        totalBalance = await balanceChecker.run();
+
         setTimeout(loop, 3000);
       });
       blockNumberPromise.catch((error) => {
@@ -54,18 +61,22 @@ async function main() {
 
   app.get("/monitored-health", (req, res) => {
     const response =
-      unsignedValidatorsMonitored.length > 0
-        ? unsignedValidatorsMonitored
-        : "true";
+      unsignedValidators.unsignedValidatorsMonitored.length > 0
+        ? "not ok\n" + unsignedValidators.unsignedValidatorsMonitored
+        : "ok";
     res.send(`${response}`);
   });
 
   app.get("/unsigned-all", (req, res) => {
     const response =
-      unsignedValidatorsAll.length > 0
-        ? unsignedValidatorsAll
+      unsignedValidators.unsignedValidatorsAll.length > 0
+        ? unsignedValidators.unsignedValidatorsAll
         : "No unsigned validators on this block";
     res.send(`${response}`);
+  });
+
+  app.get("/total-balance", (req, res) => {
+    res.send(`${JSON.stringify(totalBalance)}`);
   });
 
   app.listen(3000, () => {

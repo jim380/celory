@@ -17,24 +17,38 @@ $ docker logs csc  -f --since 1m
 
 #### Signing Status of Selected Signers
 
-From the list of signers passed in `main.js`, if a signer is currently elected and signing, her address will appear on this endpoint. If not, then she missed signing that block.
+- If all monitored signers are currently elected and signing, return `ok`
+- If there exist any unsigned monitored signers, return `not ok` and the signers' addresses
 
 ```
-http://localhost:3000/signed
+http://localhost:3000/monitored-health
 ```
 
 #### All Missing Signers at Current Block
 
-All elected signers that missed signing the latest block will appear on this endpoint.
+Return all elected signers that missed signing the latest block.
 
 ```
-http://localhost:3000/unsignedAll
+http://localhost:3000/unsigned-all
+```
+
+#### Balance Checking
+
+Return the total balances of a list of wallet addresses in the following currencies:
+
+- cUSD
+- CELO
+- Locked Celo
+- Pending Celo
+
+```
+http://localhost:3000/unsigned-all
 ```
 
 ### Set Up Alerts
 
 You can set up alerts however you want. Personally I use Uptime Kuma to periodically scrape the endpoints and do a keyword search. For instance:
 
-- If the signer address I'm monitoring appears on `http://localhost:3000/signed`, then the signer signed that block and the keyword search will succeed
+- Keyword search on each signer address at `/monitored-health`. If the search fails, then the signer signed that block. Conversely, if search succeeds, an alert is triggered via Telegram to signal the signer didn't sign that block
 
-- If instead the address is absent on `http://localhost:3000/signed`, then the signer missed that block and the keyword search will fail, triggering a alert which I have sent via Telegram
+- Alternatively, keyword search on each signer address at `http://localhost:3000/unsigned-all`, if the search fails, then the signer signed that block. Conversely, if search succeeds, an alert is triggered via Telegram to signal the signer didn't sign that block
