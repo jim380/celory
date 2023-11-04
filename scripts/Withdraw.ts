@@ -5,7 +5,7 @@ import { GoldTokenWrapper } from "@celo/contractkit/lib/wrappers/GoldTokenWrappe
 import { ExchangeWrapper } from "@celo/contractkit/lib/wrappers/Exchange";
 import { StableTokenWrapper } from "@celo/contractkit/lib/wrappers/StableTokenWrapper";
 
-dotenv.config();
+dotenv.config({ path: "../.env" });
 
 const rpcUrl = process.env.RPC_URL ?? "https://forno.celo.org";
 const kit = newKit(rpcUrl);
