@@ -1,4 +1,4 @@
-import Web3 from "web3";
+import { ethers } from "ethers";
 import { ContractKit, newKit } from "@celo/contractkit";
 import winston from "winston";
 
@@ -11,7 +11,7 @@ export interface BalanceCheckerResult {
 
 export class BalanceChecker {
   kit: ContractKit;
-  web3: Web3;
+  provider: ethers.JsonRpcProvider;
   walletAddresses: string[];
   logger: winston.Logger;
 
@@ -21,7 +21,7 @@ export class BalanceChecker {
     logger: winston.Logger
   ) {
     this.kit = newKit(rpcUrl);
-    this.web3 = new Web3(rpcUrl);
+    this.provider = new ethers.JsonRpcProvider(rpcUrl);
     this.walletAddresses = walletAddresses;
     this.logger = logger;
   }

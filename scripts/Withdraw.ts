@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-import Web3 from "web3";
+import { ethers } from "ethers";
 import { newKit, CeloContract } from "@celo/contractkit";
 import { GoldTokenWrapper } from "@celo/contractkit/lib/wrappers/GoldTokenWrapper";
 import { ExchangeWrapper } from "@celo/contractkit/lib/wrappers/Exchange";
@@ -9,8 +9,7 @@ dotenv.config({ path: "../.env" });
 
 const rpcUrl = process.env.RPC_URL ?? "https://forno.celo.org";
 const kit = newKit(rpcUrl);
-const web3 = new Web3(rpcUrl);
-
+const provider = new ethers.JsonRpcProvider(rpcUrl);
 const usesRGContract = true;
 // addresses
 const RG_CONTRACT_ADDRESS = "";
@@ -19,7 +18,7 @@ const VALIDATOR_ADDRESS = ""; // signer if not using RG contract
 const RECIPIENT_ADDRESS = "";
 
 // beneficiary account
-const account = web3.eth.accounts.privateKeyToAccount(process.env.PRIVATE_KEY!);
+const account = new ethers.Wallet(process.env.PRIVATE_KEY!);
 
 // constants
 const oneCelo = kit.web3.utils.toWei("1", "ether");
