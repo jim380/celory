@@ -3,6 +3,7 @@ import { ContractKit, newKit } from "@celo/contractkit";
 import winston from "winston";
 
 export interface BalanceCheckerResult {
+  address: string;
   cUSD: number;
   CELO: number;
   lockedCELO: number;
@@ -12,41 +13,29 @@ export interface BalanceCheckerResult {
 export class BalanceChecker {
   kit: ContractKit;
   provider: ethers.JsonRpcProvider;
-  walletAddresses: string[];
   logger: winston.Logger;
 
-  constructor(
-    rpcUrl: string,
-    walletAddresses: string[],
-    logger: winston.Logger
-  ) {
+  constructor(rpcUrl: string, logger: winston.Logger) {
     this.kit = newKit(rpcUrl);
     this.provider = new ethers.JsonRpcProvider(rpcUrl);
-    this.walletAddresses = walletAddresses;
     this.logger = logger;
   }
 
-  async run(): Promise<BalanceCheckerResult> {
-    let totalBalance: BalanceCheckerResult = {
-      cUSD: 0,
-      CELO: 0,
-      lockedCELO: 0,
-      pending: 0,
-    };
-
+  async run(addresses: string[]): Promise<BalanceCheckerResult[]> {
     const balances = await Promise.all(
-      this.walletAddresses.map((e) => this.kit.getTotalBalance(e))
+      addresses.map((address) => this.kit.getTotalBalance(address))
     );
 
-    balances.forEach((balance) => {
-      totalBalance.cUSD += balance.cUSD!.toNumber();
-      totalBalance.CELO += balance.CELO!.toNumber();
-      totalBalance.lockedCELO += balance.lockedCELO!.toNumber();
-      totalBalance.pending += balance.pending!.toNumber();
-    });
+    const results: BalanceCheckerResult[] = balances.map((balance, i) => ({
+      address: addresses[i],
+      cUSD: balance.cUSD!.toNumber(),
+      CELO: balance.CELO!.toNumber(),
+      lockedCELO: balance.lockedCELO!.toNumber(),
+      pending: balance.pending!.toNumber(),
+    }));
 
-    this.logger.info(`Total balance: ${JSON.stringify(totalBalance)}`);
+    this.logger.info(`Balances: ${JSON.stringify(results)}`);
 
-    return totalBalance;
+    return results;
   }
 }

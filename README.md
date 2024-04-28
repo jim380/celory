@@ -42,7 +42,7 @@ Return the total balances of a list of wallet addresses in the following currenc
 - Pending Celo
 
 ```
-http://localhost:3000/unsigned-all
+http://localhost:3000/total-balances/address1,address2
 ```
 
 ### Set Up Alerts
