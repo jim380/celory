@@ -1,6 +1,6 @@
-import Web3 from "web3";
 import { ContractKit, newKit } from "@celo/contractkit";
 import { bitIsSet, parseBlockExtraData } from "@celo/utils/lib/istanbul";
+import { ethers } from "ethers";
 import winston from "winston";
 
 export interface SignatureCheckerResult {
@@ -10,7 +10,7 @@ export interface SignatureCheckerResult {
 
 export class SignatureChecker {
   kit: ContractKit;
-  web3: Web3;
+  provider: ethers.JsonRpcProvider;
   signerAddresses: string[];
   logger: winston.Logger;
 
@@ -20,7 +20,7 @@ export class SignatureChecker {
     logger: winston.Logger
   ) {
     this.kit = newKit(rpcUrl);
-    this.web3 = new Web3(rpcUrl);
+    this.provider = new ethers.JsonRpcProvider(rpcUrl);
     this.signerAddresses = signerAddresses;
     this.logger = logger;
   }
@@ -31,11 +31,11 @@ export class SignatureChecker {
 
     const monitoredSigners = this.signerAddresses;
     const [block, election] = await Promise.all([
-      this.web3.eth.getBlock(blockNum),
+      this.provider.getBlock(blockNum),
       this.kit.contracts.getElection(),
     ]);
 
-    const bitmap = parseBlockExtraData(block?.extraData).parentAggregatedSeal
+    const bitmap = parseBlockExtraData(block?.extraData!).parentAggregatedSeal
       .bitmap;
 
     const signers = await election.getCurrentValidatorSigners();

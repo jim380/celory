@@ -1,6 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
-import Web3 from "web3";
+import { ethers } from "ethers";
 import winston from "winston";
 import { SignatureChecker, SignatureCheckerResult } from "./SignatureChecker";
 import { BalanceChecker, BalanceCheckerResult } from "./BalanceChecker";
@@ -21,7 +21,7 @@ const signerAddresses = process.env.SIGNER_ADDRESSES?.split(",") || [];
 const walletAddresses = process.env.WALLET_ADDRESSES?.split(",") || [];
 
 async function main() {
-  const web3 = new Web3(rpcUrl);
+  const provider = new ethers.JsonRpcProvider(rpcUrl);
 
   let totalBalance: BalanceCheckerResult;
   let unsignedValidators: SignatureCheckerResult;
@@ -36,7 +36,7 @@ async function main() {
     const balanceChecker = new BalanceChecker(rpcUrl, walletAddresses, logger);
 
     function loop() {
-      web3.eth
+      provider
         .getBlockNumber()
         .then(async (blockNumber) => {
           // signature
@@ -76,7 +76,7 @@ async function main() {
   });
 
   app.get("/total-balance", (req, res) => {
-    res.send(`${JSON.stringify(totalBalance)}`);
+    res.json(totalBalance);
   });
 
   app.listen(3000, () => {
