@@ -18,23 +18,21 @@ const app = express();
 
 const rpcUrl = process.env.RPC_URL ?? "https://forno.celo.org";
 const signerAddresses = process.env.SIGNER_ADDRESSES?.split(",") || [];
-const walletAddresses = process.env.WALLET_ADDRESSES?.split(",") || [];
 
 async function main() {
   const provider = new ethers.JsonRpcProvider(rpcUrl);
+  const signatureChecker = new SignatureChecker(
+    rpcUrl,
+    signerAddresses,
+    logger
+  );
 
-  let totalBalance: BalanceCheckerResult;
+  const balanceChecker = new BalanceChecker(rpcUrl, logger);
+
+  // let totalBalance: BalanceCheckerResult;
   let unsignedValidators: SignatureCheckerResult;
 
   try {
-    const signatureChecker = new SignatureChecker(
-      rpcUrl,
-      signerAddresses,
-      logger
-    );
-
-    const balanceChecker = new BalanceChecker(rpcUrl, walletAddresses, logger);
-
     function loop() {
       provider
         .getBlockNumber()
@@ -43,7 +41,7 @@ async function main() {
           unsignedValidators = await signatureChecker.run(blockNumber);
 
           // balance
-          totalBalance = await balanceChecker.run();
+          // totalBalance = await balanceChecker.run();
         })
         .catch((error) => {
           logger.error("Error getting block number:", error);
@@ -75,8 +73,21 @@ async function main() {
     res.send(`${response}`);
   });
 
-  app.get("/total-balance", (req, res) => {
-    res.json(totalBalance);
+  app.get("/total-balances/:addresses", async (req, res) => {
+    const addresses = req.params.addresses.split(",");
+    const invalidAddress = addresses.find(
+      (address) => !ethers.isAddress(address)
+    );
+    if (invalidAddress) {
+      return res.status(400).send(`Invalid EVM address: ${invalidAddress}`);
+    }
+
+    const balances = await balanceChecker.run(addresses);
+    if (balances) {
+      res.json(balances);
+    } else {
+      res.status(404).send("Addresses not found");
+    }
   });
 
   app.listen(3000, () => {
