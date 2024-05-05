@@ -3,7 +3,11 @@ import dotenv from "dotenv";
 import { ethers } from "ethers";
 import winston from "winston";
 import { SignatureChecker, SignatureCheckerResult } from "./SignatureChecker";
-import { BalanceChecker, BalanceCheckerResult } from "./BalanceChecker";
+import { BalanceChecker } from "./BalanceChecker";
+import { GroupChecker } from "./GroupChecker";
+import { abi as validatorGroupImplAbi } from "./abis/ValidatorGroupImpl.json";
+import { abi as accountImplAbi } from "./abis/AccountImpl.json";
+import { abi as electionImplAbi } from "./abis/ElectionImpl.json";
 
 dotenv.config();
 
@@ -21,6 +25,25 @@ const signerAddresses = process.env.SIGNER_ADDRESSES?.split(",") || [];
 
 async function main() {
   const provider = new ethers.JsonRpcProvider(rpcUrl);
+
+  const validatorProxy = new ethers.Contract(
+    "0xaEb865bCa93DdC8F47b8e29F40C5399cE34d0C58", // proxy
+    validatorGroupImplAbi,
+    provider
+  );
+
+  const accountProxy = new ethers.Contract(
+    "0x7d21685C17607338b313a7174bAb6620baD0aaB7", // proxy
+    accountImplAbi,
+    provider
+  );
+
+  const electionProxy = new ethers.Contract(
+    "0x8D6677192144292870907E3Fa8A5527fE55A7ff6", // proxy
+    electionImplAbi,
+    provider
+  );
+
   const signatureChecker = new SignatureChecker(
     rpcUrl,
     signerAddresses,
@@ -28,8 +51,14 @@ async function main() {
   );
 
   const balanceChecker = new BalanceChecker(rpcUrl, logger);
+  const groupChecker = new GroupChecker(
+    rpcUrl,
+    validatorProxy,
+    accountProxy,
+    electionProxy,
+    logger
+  );
 
-  // let totalBalance: BalanceCheckerResult;
   let unsignedValidators: SignatureCheckerResult;
 
   try {
@@ -39,9 +68,6 @@ async function main() {
         .then(async (blockNumber) => {
           // signature
           unsignedValidators = await signatureChecker.run(blockNumber);
-
-          // balance
-          // totalBalance = await balanceChecker.run();
         })
         .catch((error) => {
           logger.error("Error getting block number:", error);
@@ -85,6 +111,23 @@ async function main() {
     const balances = await balanceChecker.run(addresses);
     if (balances) {
       res.json(balances);
+    } else {
+      res.status(404).send("Addresses not found");
+    }
+  });
+
+  app.get("/groups/:addresses", async (req, res) => {
+    const addresses = req.params.addresses.split(",");
+    const invalidAddress = addresses.find(
+      (address) => !ethers.isAddress(address)
+    );
+    if (invalidAddress) {
+      return res.status(400).send(`Invalid EVM address: ${invalidAddress}`);
+    }
+
+    const results = await groupChecker.run(addresses);
+    if (results) {
+      res.json(results);
     } else {
       res.status(404).send("Addresses not found");
     }
