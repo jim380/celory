@@ -116,7 +116,7 @@ async function main() {
     }
   });
 
-  app.get("/group/:addresses", async (req, res) => {
+  app.get("/groups/:addresses", async (req, res) => {
     const addresses = req.params.addresses.split(",");
     const invalidAddress = addresses.find(
       (address) => !ethers.isAddress(address)
