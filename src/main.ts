@@ -8,8 +8,21 @@ import { GroupChecker } from "./GroupChecker";
 import { abi as validatorGroupImplAbi } from "./abis/ValidatorGroupImpl.json";
 import { abi as accountImplAbi } from "./abis/AccountImpl.json";
 import { abi as electionImplAbi } from "./abis/ElectionImpl.json";
+import { Pool } from "pg";
+import { DatabaseService } from "./Database";
 
 dotenv.config();
+
+const pool = new Pool({
+  user: process.env.PG_USER,
+  host: process.env.PG_HOST,
+  database: process.env.PG_DATABASE,
+  password: process.env.PG_PASSWORD,
+  port: parseInt(process.env.PG_PORT || "5432", 10),
+  ssl: false,
+});
+
+const dbService = new DatabaseService(pool);
 
 const logger = winston.createLogger({
   level: "info",
@@ -47,7 +60,8 @@ async function main() {
   const signatureChecker = new SignatureChecker(
     rpcUrl,
     signerAddresses,
-    logger
+    logger,
+    dbService
   );
 
   const balanceChecker = new BalanceChecker(rpcUrl, logger);
@@ -56,7 +70,8 @@ async function main() {
     validatorProxy,
     accountProxy,
     electionProxy,
-    logger
+    logger,
+    dbService
   );
 
   let unsignedValidators: SignatureCheckerResult;

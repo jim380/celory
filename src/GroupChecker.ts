@@ -2,6 +2,7 @@ import { ethers } from "ethers";
 import Decimal from "decimal.js";
 import { ContractKit, newKit } from "@celo/contractkit";
 import winston from "winston";
+import { DatabaseService } from "./Database";
 
 interface votes {
   total: string;
@@ -40,13 +41,15 @@ export class GroupChecker {
   validatorProxy: ethers.Contract;
   accountProxy: ethers.Contract;
   electionProxy: ethers.Contract;
+  dbService: DatabaseService;
 
   constructor(
     rpcUrl: string,
     validatorProxy: ethers.Contract,
     accountProxy: ethers.Contract,
     electionProxy: ethers.Contract,
-    logger: winston.Logger
+    logger: winston.Logger,
+    dbService: DatabaseService
   ) {
     this.kit = newKit(rpcUrl);
     this.provider = new ethers.JsonRpcProvider(rpcUrl);
@@ -54,6 +57,7 @@ export class GroupChecker {
     this.validatorProxy = validatorProxy;
     this.accountProxy = accountProxy;
     this.electionProxy = electionProxy;
+    this.dbService = dbService;
   }
 
   async run(addresses: string[]): Promise<GroupCheckerResult[]> {
@@ -66,7 +70,7 @@ export class GroupChecker {
         const commission = new Decimal(groupInfo[1].toString());
         const multiplier = new Decimal(groupInfo[5].toString());
 
-        return {
+        const result: GroupCheckerResult = {
           name: await this.getName(address),
           address: address,
           isEligible: await this.isGroupEligible(address),
@@ -77,6 +81,10 @@ export class GroupChecker {
           voteSigner: await this.getVoteSigner(address),
           domain: metadata.domain,
         };
+
+        await this.dbService.saveGroup(result);
+
+        return result;
       })
     );
 
@@ -150,6 +158,9 @@ export class GroupChecker {
       }
 
       // Validate the URL
+      if (!url || url === "https://") {
+        throw new Error(`Invalid URL for ${address}`);
+      }
       new URL(url);
 
       const response = await fetch(url);

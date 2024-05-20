@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS unsigned (
+  id SERIAL PRIMARY KEY,
+  block_num INTEGER,
+  validator_id INTEGER REFERENCES validator(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
