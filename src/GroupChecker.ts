@@ -141,13 +141,31 @@ export class GroupChecker {
   }
 
   async getMetadata(address: string): Promise<metadata> {
-    const url = await this.accountProxy.getMetadataURL(address);
-    const response = await fetch(url);
-    const data = await response.json();
-    const domain = data.claims.find(
-      (claim: any) => claim.type === "DOMAIN"
-    ).domain;
+    try {
+      let url = await this.accountProxy.getMetadataURL(address);
 
-    return { domain };
+      // Add default scheme if missing
+      if (!/^https?:\/\//i.test(url)) {
+        url = `https://${url}`;
+      }
+
+      // Validate the URL
+      new URL(url);
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch metadata for ${address}`);
+      }
+
+      const data = await response.json();
+      const domain = data.claims.find(
+        (claim: any) => claim.type === "DOMAIN"
+      ).domain;
+
+      return { domain };
+    } catch (error) {
+      this.logger.error(`Error fetching metadata for ${address}:`, error);
+      return { domain: "" };
+    }
   }
 }

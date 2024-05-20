@@ -99,16 +99,21 @@ async function main() {
     res.send(`${response}`);
   });
 
-  app.get("/total-balances/:addresses", async (req, res) => {
-    const addresses = req.params.addresses.split(",");
-    const invalidAddress = addresses.find(
-      (address) => !ethers.isAddress(address)
+  app.get("/total-balances", async (req, res) => {
+    const addresses = req.query.addresses as string | undefined;
+    if (!addresses) {
+      return res.status(400).send("Addresses query parameter is required");
+    }
+
+    const addressArray = addresses.split(",");
+    const invalidAddress = addressArray.find(
+      (address: string) => !ethers.isAddress(address)
     );
     if (invalidAddress) {
       return res.status(400).send(`Invalid EVM address: ${invalidAddress}`);
     }
 
-    const balances = await balanceChecker.run(addresses);
+    const balances = await balanceChecker.run(addressArray);
     if (balances) {
       res.json(balances);
     } else {
@@ -116,16 +121,21 @@ async function main() {
     }
   });
 
-  app.get("/groups/:addresses", async (req, res) => {
-    const addresses = req.params.addresses.split(",");
-    const invalidAddress = addresses.find(
-      (address) => !ethers.isAddress(address)
+  app.get("/groups", async (req, res) => {
+    const addresses = req.query.addresses as string | undefined;
+    if (!addresses) {
+      return res.status(400).send("Addresses query parameter is required");
+    }
+
+    const addressArray = addresses.split(",");
+    const invalidAddress = addressArray.find(
+      (address: string) => !ethers.isAddress(address)
     );
     if (invalidAddress) {
       return res.status(400).send(`Invalid EVM address: ${invalidAddress}`);
     }
 
-    const results = await groupChecker.run(addresses);
+    const results = await groupChecker.run(addressArray);
     if (results) {
       res.json(results);
     } else {

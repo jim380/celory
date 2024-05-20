@@ -41,7 +41,7 @@ http://localhost:3000/unsigned-all
 #### Balances
 
 ```
-http://localhost:3000/total-balances/address1,address2
+http://localhost:3000/total-balances?addresses=address1,address2
 ```
 
 <details>
@@ -65,7 +65,7 @@ http://localhost:3000/total-balances/address1,address2
 #### Groups
 
 ```
-http://localhost:3000/groups/address1,address2
+http://localhost:3000/groups?addresses=address1,address2
 ```
 
 <details>
