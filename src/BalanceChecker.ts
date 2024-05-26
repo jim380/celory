@@ -21,6 +21,7 @@ export class BalanceChecker {
     this.logger = logger;
   }
 
+  // always query on the fly for now
   async run(addresses: string[]): Promise<BalanceCheckerResult[]> {
     const balances = await Promise.all(
       addresses.map((address) => this.kit.getTotalBalance(address))

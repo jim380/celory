@@ -75,21 +75,29 @@ async function main() {
   );
 
   let unsignedValidators: SignatureCheckerResult;
+  let latestBlockNumber: number;
 
   try {
-    function loop() {
-      provider
-        .getBlockNumber()
-        .then(async (blockNumber) => {
-          // signature
-          unsignedValidators = await signatureChecker.run(blockNumber);
-        })
-        .catch((error) => {
-          logger.error("Error getting block number:", error);
-        })
-        .finally(() => {
-          setTimeout(loop, 3000);
-        });
+    async function loop() {
+      try {
+        latestBlockNumber = await provider.getBlockNumber();
+
+        // signature
+        unsignedValidators = await signatureChecker.run(latestBlockNumber);
+
+        // groups
+        const registeredGroups =
+          await validatorProxy.getRegisteredValidatorGroups();
+        const eligibleGroups = await electionProxy.getEligibleValidatorGroups();
+        const uniqueGroups = [
+          ...new Set([...registeredGroups, ...eligibleGroups]),
+        ];
+        await groupChecker.save(uniqueGroups as string[]);
+      } catch (error) {
+        logger.error("Error in loop function:", error);
+      } finally {
+        setTimeout(loop, 3000);
+      }
     }
 
     loop();
@@ -106,12 +114,32 @@ async function main() {
     res.send(`${response}`);
   });
 
-  app.get("/unsigned-all", (req, res) => {
-    const response =
-      unsignedValidators.unsignedValidatorsAll.length > 0
-        ? unsignedValidators.unsignedValidatorsAll
-        : "No unsigned validators on this block";
-    res.send(`${response}`);
+  app.get("/unsigned-all", async (req, res) => {
+    let height = req.query.height as string | undefined;
+
+    try {
+      let blockNum: number;
+      if (!height) {
+        blockNum = latestBlockNumber;
+      } else {
+        blockNum = parseInt(height, 10);
+        if (isNaN(blockNum)) {
+          return res.status(400).send("Invalid height query parameter");
+        }
+      }
+
+      const unsignedValidators = await dbService.getUnsignedValidators(
+        blockNum
+      );
+      const response =
+        unsignedValidators.length > 0
+          ? unsignedValidators
+          : "No unsigned validators on this block";
+      res.json({ response });
+    } catch (error) {
+      logger.error("Error fetching unsigned validators:", error);
+      res.status(500).send("Internal server error");
+    }
   });
 
   app.get("/total-balances", async (req, res) => {
@@ -150,7 +178,29 @@ async function main() {
       return res.status(400).send(`Invalid EVM address: ${invalidAddress}`);
     }
 
-    const results = await groupChecker.run(addressArray);
+    const results = await groupChecker.dbService.getGroupInfo(addressArray);
+    if (results) {
+      res.json(results);
+    } else {
+      res.status(404).send("Addresses not found");
+    }
+  });
+
+  app.get("/validators", async (req, res) => {
+    const addresses = req.query.addresses as string | undefined;
+    if (!addresses) {
+      return res.status(400).send("Addresses query parameter is required");
+    }
+
+    const addressArray = addresses.split(",");
+    const invalidAddress = addressArray.find(
+      (address: string) => !ethers.isAddress(address)
+    );
+    if (invalidAddress) {
+      return res.status(400).send(`Invalid EVM address: ${invalidAddress}`);
+    }
+
+    const results = await groupChecker.dbService.getValidatorInfo(addressArray);
     if (results) {
       res.json(results);
     } else {

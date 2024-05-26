@@ -11,11 +11,12 @@ interface votes {
   receivable: string;
 }
 
-interface members {
+export interface member {
   address: string;
-  voteSinger: string;
+  voteSigner: string;
   elected: boolean;
   score: string;
+  group: GroupCheckerResult;
 }
 
 interface metadata {
@@ -27,7 +28,7 @@ export interface GroupCheckerResult {
   address: string;
   isEligible: boolean;
   votes: votes;
-  members: members[];
+  members: member[];
   commission: number;
   lastSlashed: string;
   domain: string;
@@ -60,7 +61,7 @@ export class GroupChecker {
     this.dbService = dbService;
   }
 
-  async run(addresses: string[]): Promise<GroupCheckerResult[]> {
+  async save(addresses: string[]): Promise<GroupCheckerResult[]> {
     const results: GroupCheckerResult[] = await Promise.all(
       addresses.map(async (address) => {
         const groupInfo = await this.validatorProxy.getValidatorGroup(address);
@@ -82,7 +83,7 @@ export class GroupChecker {
           domain: metadata.domain,
         };
 
-        await this.dbService.saveGroup(result);
+        await this.dbService.upsertGroup(result);
 
         return result;
       })
@@ -120,13 +121,13 @@ export class GroupChecker {
     return { total, active, pending, receivable };
   }
 
-  async getMemberInfo(members: any): Promise<members[]> {
+  async getMemberInfo(members: any): Promise<member[]> {
     const memberPromises = members.map(async (member: string) => {
       const validatorInfo = await this.validatorProxy.getValidator(member);
 
       return {
         address: member,
-        voteSinger: await this.getVoteSigner(member),
+        voteSigner: await this.getVoteSigner(member),
         elected: await this.isElected(validatorInfo),
         score: validatorInfo[3].toString(),
       };
