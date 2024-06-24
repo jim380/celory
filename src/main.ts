@@ -223,8 +223,19 @@ async function main() {
   });
 
   app.get("/proposals", async (req, res) => {
-    // TO-DO save and load from db
-    const results = await govChecker.save(BigInt(10));
+    var results;
+    const ids = req.query.ids as string | undefined;
+    if (!ids) {
+      const proposalCount = await govProxy.proposalCount();
+      const proposalIds: string[] = [];
+      for (let i = 1n; i <= proposalCount; i++) {
+        proposalIds.push(i.toString());
+      }
+      results = await govChecker.dbService.getProposalInfo(proposalIds);
+    } else {
+      const idArray = ids.split(",");
+      results = await govChecker.dbService.getProposalInfo(idArray);
+    }
     if (results) {
       res.json(results);
     } else {

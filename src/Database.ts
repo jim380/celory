@@ -1,5 +1,6 @@
 import { Pool } from "pg";
 import { GroupCheckerResult, member } from "./GroupChecker";
+import { GovCheckerResult } from "./GovChecker";
 
 export class DatabaseService {
   private pool: Pool;
@@ -53,6 +54,77 @@ export class DatabaseService {
         block_num INTEGER,
         validator_id INTEGER REFERENCES validator(id) ON DELETE CASCADE,
         created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // Add the missing tables for proposals
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS proposer (
+        id SERIAL PRIMARY KEY,
+        address TEXT UNIQUE,
+        deposit TEXT,
+        timestamp TEXT
+      )
+    `);
+
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS votes (
+        id SERIAL PRIMARY KEY,
+        total TEXT,
+        yes TEXT,
+        no TEXT,
+        abstain TEXT,
+        UNIQUE (total, yes, no, abstain)
+      )
+    `);
+
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS dequeue (
+        id SERIAL PRIMARY KEY,
+        status TEXT,
+        index TEXT,
+        address TEXT,
+        timestamp TEXT,
+        UNIQUE (status, index, address, timestamp)
+      )
+    `);
+
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS approval (
+        id SERIAL PRIMARY KEY,
+        status TEXT,
+        address TEXT,
+        timestamp TEXT,
+        UNIQUE (status, address, timestamp)
+      )
+    `);
+
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS execution (
+        id SERIAL PRIMARY KEY,
+        "from" TEXT,
+        timestamp TEXT,
+        block_number TEXT,
+        tx_hash TEXT,
+        UNIQUE ("from", timestamp, block_number, tx_hash)
+      )
+    `);
+
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS proposal (
+        id SERIAL PRIMARY KEY,
+        proposal_id TEXT UNIQUE,
+        status TEXT,
+        timespan TEXT,
+        title TEXT,
+        description TEXT,
+        proposer_id INTEGER REFERENCES proposer(id),
+        votes_id INTEGER REFERENCES votes(id),
+        dequeue_id INTEGER REFERENCES dequeue(id),
+        approval_id INTEGER REFERENCES approval(id),
+        execution_id INTEGER REFERENCES execution(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        upvotes INTEGER DEFAULT 0  -- Add this line
       )
     `);
   }
@@ -373,5 +445,274 @@ export class DatabaseService {
       "INSERT INTO unsigned (block_num, validator_id) VALUES ($1, $2)",
       [blockNum, validatorId]
     );
+  }
+
+  async upsertProposal(result: GovCheckerResult): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // Upsert proposer
+      const proposerQuery = `
+        INSERT INTO proposer (address, deposit, timestamp)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (address) DO UPDATE SET
+          deposit = EXCLUDED.deposit,
+          timestamp = EXCLUDED.timestamp
+        RETURNING id
+      `;
+      const proposerValues = [
+        result.proposer.address,
+        result.proposer.deposit,
+        result.proposer.timestamp,
+      ];
+      let proposerResult = await client.query(proposerQuery, proposerValues);
+      if (proposerResult.rows.length === 0) {
+        proposerResult = await client.query(
+          "SELECT id FROM proposer WHERE address = $1",
+          [result.proposer.address]
+        );
+      }
+      const proposerId = proposerResult.rows[0].id;
+
+      // Upsert votes
+      const votesQuery = `
+        INSERT INTO votes (total, yes, no, abstain)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (total, yes, no, abstain) DO NOTHING
+        RETURNING id
+      `;
+      const votesValues = [
+        result.votes.total,
+        result.votes.yes,
+        result.votes.no,
+        result.votes.abstain,
+      ];
+      let votesResult = await client.query(votesQuery, votesValues);
+      if (votesResult.rows.length === 0) {
+        votesResult = await client.query(
+          "SELECT id FROM votes WHERE total = $1 AND yes = $2 AND no = $3 AND abstain = $4",
+          votesValues
+        );
+      }
+      const votesId = votesResult.rows[0].id;
+
+      // Upsert dequeue
+      const dequeueQuery = `
+        INSERT INTO dequeue (status, index, address, timestamp)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (status, index, address, timestamp) DO NOTHING
+        RETURNING id
+      `;
+      const dequeueValues = [
+        result.dequeue.status,
+        result.dequeue.index,
+        result.dequeue.address,
+        result.dequeue.timestamp,
+      ];
+      let dequeueResult = await client.query(dequeueQuery, dequeueValues);
+      if (dequeueResult.rows.length === 0) {
+        dequeueResult = await client.query(
+          "SELECT id FROM dequeue WHERE status = $1 AND index = $2 AND address = $3 AND timestamp = $4",
+          dequeueValues
+        );
+      }
+      const dequeueId = dequeueResult.rows[0].id;
+
+      // Upsert approval
+      const approvalQuery = `
+        INSERT INTO approval (status, address, timestamp)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (status, address, timestamp) DO NOTHING
+        RETURNING id
+      `;
+      const approvalValues = [
+        result.approved.status,
+        result.approved.address,
+        result.approved.timestamp,
+      ];
+      let approvalResult = await client.query(approvalQuery, approvalValues);
+      if (approvalResult.rows.length === 0) {
+        approvalResult = await client.query(
+          "SELECT id FROM approval WHERE status = $1 AND address = $2 AND timestamp = $3",
+          approvalValues
+        );
+      }
+      const approvalId = approvalResult.rows[0].id;
+
+      // Upsert execution
+      const executionQuery = `
+        INSERT INTO execution ("from", timestamp, block_number, tx_hash)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT ("from", timestamp, block_number, tx_hash) DO NOTHING
+        RETURNING id
+      `;
+      const executionValues = [
+        result.executed.from,
+        result.executed.timestamp,
+        result.executed.blockNumber,
+        result.executed.txHash,
+      ];
+      let executionResult = await client.query(executionQuery, executionValues);
+      if (executionResult.rows.length === 0) {
+        executionResult = await client.query(
+          'SELECT id FROM execution WHERE "from" = $1 AND timestamp = $2 AND block_number = $3 AND tx_hash = $4',
+          executionValues
+        );
+      }
+      const executionId = executionResult.rows[0].id;
+
+      // Upsert proposal
+      const proposalQuery = `
+        INSERT INTO proposal (
+          proposal_id, status, timespan, title, description, proposer_id, votes_id, dequeue_id, approval_id, execution_id, upvotes
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        ON CONFLICT (proposal_id) DO UPDATE SET
+          status = EXCLUDED.status,
+          timespan = EXCLUDED.timespan,
+          title = EXCLUDED.title,
+          description = EXCLUDED.description,
+          proposer_id = EXCLUDED.proposer_id,
+          votes_id = EXCLUDED.votes_id,
+          dequeue_id = EXCLUDED.dequeue_id,
+          approval_id = EXCLUDED.approval_id,
+          execution_id = EXCLUDED.execution_id,
+          upvotes = EXCLUDED.upvotes,
+          created_at = NOW()
+        RETURNING id
+      `;
+      const proposalValues = [
+        result.id,
+        result.status,
+        result.timespan,
+        result.title,
+        result.description,
+        proposerId,
+        votesId,
+        dequeueId,
+        approvalId,
+        executionId,
+        result.upvotes, // Add this line
+      ];
+      await client.query(proposalQuery, proposalValues);
+
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getProposalInfo(proposalIds: string[]): Promise<GovCheckerResult[]> {
+    const results: GovCheckerResult[] = [];
+
+    for (const proposalId of proposalIds) {
+      try {
+        const proposalQuery = `
+          SELECT id, proposal_id, status, timespan, title, description, proposer_id, votes_id, dequeue_id, approval_id, execution_id, upvotes
+          FROM proposal
+          WHERE proposal_id = $1
+        `;
+        const proposalResult = await this.pool.query(proposalQuery, [
+          proposalId,
+        ]);
+
+        if (proposalResult.rows.length === 0) {
+          continue;
+        }
+
+        const proposal = proposalResult.rows[0];
+
+        const proposerQuery = `
+          SELECT address, deposit, timestamp
+          FROM proposer
+          WHERE id = $1
+        `;
+        const proposerResult = await this.pool.query(proposerQuery, [
+          proposal.proposer_id,
+        ]);
+
+        const votesQuery = `
+          SELECT total, yes, no, abstain
+          FROM votes
+          WHERE id = $1
+        `;
+        const votesResult = await this.pool.query(votesQuery, [
+          proposal.votes_id,
+        ]);
+
+        const dequeueQuery = `
+          SELECT status, index, address, timestamp
+          FROM dequeue
+          WHERE id = $1
+        `;
+        const dequeueResult = await this.pool.query(dequeueQuery, [
+          proposal.dequeue_id,
+        ]);
+
+        const approvalQuery = `
+          SELECT status, address, timestamp
+          FROM approval
+          WHERE id = $1
+        `;
+        const approvalResult = await this.pool.query(approvalQuery, [
+          proposal.approval_id,
+        ]);
+
+        const executionQuery = `
+          SELECT "from", timestamp, block_number, tx_hash
+          FROM execution
+          WHERE id = $1
+        `;
+        const executionResult = await this.pool.query(executionQuery, [
+          proposal.execution_id,
+        ]);
+
+        const result: GovCheckerResult = {
+          id: proposal.proposal_id,
+          status: proposal.status,
+          timespan: proposal.timespan,
+          title: proposal.title,
+          description: proposal.description,
+          proposer: {
+            address: proposerResult.rows[0].address,
+            deposit: proposerResult.rows[0].deposit,
+            timestamp: proposerResult.rows[0].timestamp,
+          },
+          votes: {
+            total: votesResult.rows[0].total,
+            yes: votesResult.rows[0].yes,
+            no: votesResult.rows[0].no,
+            abstain: votesResult.rows[0].abstain,
+          },
+          dequeue: {
+            status: dequeueResult.rows[0].status,
+            index: dequeueResult.rows[0].index,
+            address: dequeueResult.rows[0].address,
+            timestamp: dequeueResult.rows[0].timestamp,
+          },
+          approved: {
+            status: approvalResult.rows[0].status,
+            address: approvalResult.rows[0].address,
+            timestamp: approvalResult.rows[0].timestamp,
+          },
+          executed: {
+            from: executionResult.rows[0].from,
+            timestamp: executionResult.rows[0].timestamp,
+            blockNumber: executionResult.rows[0].block_number,
+            txHash: executionResult.rows[0].tx_hash,
+          },
+          upvotes: proposal.upvotes,
+        };
+
+        results.push(result);
+      } catch (error) {
+        console.error(`Error processing proposalId ${proposalId}:`, error);
+      }
+    }
+
+    return results;
   }
 }

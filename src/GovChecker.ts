@@ -132,7 +132,7 @@ export class GovChecker {
           },
         };
 
-        // await this.dbService.upsertGroup(result);
+        await this.dbService.upsertProposal(result);
 
         return result;
       })

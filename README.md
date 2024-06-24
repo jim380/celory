@@ -176,6 +176,59 @@ http://localhost:3000/validators?addresses=address1,address2
 
 </details>
 
+#### Proposals
+
+```
+http://localhost:3000/proposals?ids=id1,id2,id3
+```
+
+<details>
+
+<summary>sample response</summary>
+
+```
+[
+  {
+    "id": "1",
+    "status": "Expiration",
+    "timespan": "0",
+    "title": "0",
+    "description": "",
+    "proposer": {
+      "address": "0x0000000000000000000000000000000000000000",
+      "deposit": "0",
+      "timestamp": "0"
+    },
+    "votes": {
+      "total": "0",
+      "yes": "0",
+      "no": "0",
+      "abstain": "0"
+    },
+    "dequeue": {
+      "status": "false",
+      "index": "",
+      "address": "0",
+      "timestamp": "0"
+    },
+    "approved": {
+      "status": "false",
+      "address": "0",
+      "timestamp": "0"
+    },
+    "executed": {
+      "from": "0",
+      "timestamp": "0",
+      "blockNumber": "0",
+      "txHash": "0"
+    },
+    "upvotes": 0
+  }
+]
+```
+
+</details>
+
 ### Set Up Alerts
 
 You can set up alerts however you want. Personally I use Uptime Kuma to periodically scrape the endpoints and do a keyword search. For instance:
