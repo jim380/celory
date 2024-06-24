@@ -176,7 +176,7 @@ export class GroupChecker {
 
       return { domain };
     } catch (error) {
-      this.logger.error(`Error fetching metadata for ${address}:`, error);
+      // this.logger.error(`Error fetching metadata for ${address}:`, error);
       return { domain: "" };
     }
   }

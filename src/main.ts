@@ -5,9 +5,11 @@ import winston from "winston";
 import { SignatureChecker, SignatureCheckerResult } from "./SignatureChecker";
 import { BalanceChecker } from "./BalanceChecker";
 import { GroupChecker } from "./GroupChecker";
+import { GovChecker } from "./GovChecker";
 import { abi as validatorGroupImplAbi } from "./abis/ValidatorGroupImpl.json";
 import { abi as accountImplAbi } from "./abis/AccountImpl.json";
 import { abi as electionImplAbi } from "./abis/ElectionImpl.json";
+import { abi as govImplAbi } from "./abis/GovImpl.json";
 import { Pool } from "pg";
 import { DatabaseService } from "./Database";
 
@@ -57,6 +59,12 @@ async function main() {
     provider
   );
 
+  const govProxy = new ethers.Contract(
+    "0xD533Ca259b330c7A88f74E000a3FaEa2d63B7972", // proxy
+    govImplAbi,
+    provider
+  );
+
   const signatureChecker = new SignatureChecker(
     rpcUrl,
     signerAddresses,
@@ -73,6 +81,8 @@ async function main() {
     logger,
     dbService
   );
+
+  const govChecker = new GovChecker(rpcUrl, govProxy, logger, dbService);
 
   let unsignedValidators: SignatureCheckerResult;
   let latestBlockNumber: number;
@@ -93,6 +103,10 @@ async function main() {
           ...new Set([...registeredGroups, ...eligibleGroups]),
         ];
         await groupChecker.save(uniqueGroups as string[]);
+
+        // gov
+        const proposalCount = await govProxy.proposalCount();
+        await govChecker.save(proposalCount);
       } catch (error) {
         logger.error("Error in loop function:", error);
       } finally {
@@ -201,6 +215,16 @@ async function main() {
     }
 
     const results = await groupChecker.dbService.getValidatorInfo(addressArray);
+    if (results) {
+      res.json(results);
+    } else {
+      res.status(404).send("Addresses not found");
+    }
+  });
+
+  app.get("/proposals", async (req, res) => {
+    // TO-DO save and load from db
+    const results = await govChecker.save(BigInt(10));
     if (results) {
       res.json(results);
     } else {
