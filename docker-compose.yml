@@ -1,0 +1,29 @@
+version: "3.9"
+
+networks:
+  celory:
+
+services:
+  db:
+    image: postgres
+    container_name: celory_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 1234567890
+      POSTGRES_DB: celory
+    ports:
+      - 5432:5432
+    networks:
+      - celory
+
+  adminer:
+    image: adminer
+    container_name: celory_adminer
+    restart: unless-stopped
+    environment:
+      ADMINER_DESIGN: dracula
+    ports:
+      - 3333:8080
+    networks:
+      - celory

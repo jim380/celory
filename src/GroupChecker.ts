@@ -2,6 +2,7 @@ import { ethers } from "ethers";
 import Decimal from "decimal.js";
 import { ContractKit, newKit } from "@celo/contractkit";
 import winston from "winston";
+import { DatabaseService } from "./Database";
 
 interface votes {
   total: string;
@@ -10,11 +11,12 @@ interface votes {
   receivable: string;
 }
 
-interface members {
+export interface member {
   address: string;
-  voteSinger: string;
+  voteSigner: string;
   elected: boolean;
   score: string;
+  group: GroupCheckerResult;
 }
 
 interface metadata {
@@ -26,7 +28,7 @@ export interface GroupCheckerResult {
   address: string;
   isEligible: boolean;
   votes: votes;
-  members: members[];
+  members: member[];
   commission: number;
   lastSlashed: string;
   domain: string;
@@ -40,13 +42,15 @@ export class GroupChecker {
   validatorProxy: ethers.Contract;
   accountProxy: ethers.Contract;
   electionProxy: ethers.Contract;
+  dbService: DatabaseService;
 
   constructor(
     rpcUrl: string,
     validatorProxy: ethers.Contract,
     accountProxy: ethers.Contract,
     electionProxy: ethers.Contract,
-    logger: winston.Logger
+    logger: winston.Logger,
+    dbService: DatabaseService
   ) {
     this.kit = newKit(rpcUrl);
     this.provider = new ethers.JsonRpcProvider(rpcUrl);
@@ -54,9 +58,10 @@ export class GroupChecker {
     this.validatorProxy = validatorProxy;
     this.accountProxy = accountProxy;
     this.electionProxy = electionProxy;
+    this.dbService = dbService;
   }
 
-  async run(addresses: string[]): Promise<GroupCheckerResult[]> {
+  async save(addresses: string[]): Promise<GroupCheckerResult[]> {
     const results: GroupCheckerResult[] = await Promise.all(
       addresses.map(async (address) => {
         const groupInfo = await this.validatorProxy.getValidatorGroup(address);
@@ -66,7 +71,7 @@ export class GroupChecker {
         const commission = new Decimal(groupInfo[1].toString());
         const multiplier = new Decimal(groupInfo[5].toString());
 
-        return {
+        const result: GroupCheckerResult = {
           name: await this.getName(address),
           address: address,
           isEligible: await this.isGroupEligible(address),
@@ -77,6 +82,10 @@ export class GroupChecker {
           voteSigner: await this.getVoteSigner(address),
           domain: metadata.domain,
         };
+
+        await this.dbService.upsertGroup(result);
+
+        return result;
       })
     );
 
@@ -112,13 +121,13 @@ export class GroupChecker {
     return { total, active, pending, receivable };
   }
 
-  async getMemberInfo(members: any): Promise<members[]> {
+  async getMemberInfo(members: any): Promise<member[]> {
     const memberPromises = members.map(async (member: string) => {
       const validatorInfo = await this.validatorProxy.getValidator(member);
 
       return {
         address: member,
-        voteSinger: await this.getVoteSigner(member),
+        voteSigner: await this.getVoteSigner(member),
         elected: await this.isElected(validatorInfo),
         score: validatorInfo[3].toString(),
       };
@@ -150,6 +159,9 @@ export class GroupChecker {
       }
 
       // Validate the URL
+      if (!url || url === "https://") {
+        throw new Error(`Invalid URL for ${address}`);
+      }
       new URL(url);
 
       const response = await fetch(url);
@@ -164,7 +176,7 @@ export class GroupChecker {
 
       return { domain };
     } catch (error) {
-      this.logger.error(`Error fetching metadata for ${address}:`, error);
+      // this.logger.error(`Error fetching metadata for ${address}:`, error);
       return { domain: "" };
     }
   }

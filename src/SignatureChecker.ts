@@ -2,6 +2,7 @@ import { ContractKit, newKit } from "@celo/contractkit";
 import { bitIsSet, parseBlockExtraData } from "@celo/utils/lib/istanbul";
 import { ethers } from "ethers";
 import winston from "winston";
+import { DatabaseService } from "./Database";
 
 export interface SignatureCheckerResult {
   unsignedValidatorsMonitored: string[];
@@ -13,16 +14,19 @@ export class SignatureChecker {
   provider: ethers.JsonRpcProvider;
   signerAddresses: string[];
   logger: winston.Logger;
+  dbService: DatabaseService;
 
   constructor(
     rpcUrl: string,
     signerAddresses: string[],
-    logger: winston.Logger
+    logger: winston.Logger,
+    dbService: DatabaseService
   ) {
     this.kit = newKit(rpcUrl);
     this.provider = new ethers.JsonRpcProvider(rpcUrl);
     this.signerAddresses = signerAddresses;
     this.logger = logger;
+    this.dbService = dbService;
   }
 
   async run(blockNum: number): Promise<SignatureCheckerResult> {
@@ -37,7 +41,6 @@ export class SignatureChecker {
 
     const bitmap = parseBlockExtraData(block?.extraData!).parentAggregatedSeal
       .bitmap;
-
     const signers = await election.getCurrentValidatorSigners();
 
     // Remove monitored signers that are not elected
@@ -55,7 +58,12 @@ export class SignatureChecker {
     if (unsignedValidators.length > 0) {
       unsignedValidatorsAll = unsignedValidators;
 
-      // find monitored signers that are unsigned
+      // Persist unsigned validators
+      for (const validator of unsignedValidatorsAll) {
+        await this.dbService.saveUnsignedValidator(blockNum, validator);
+      }
+
+      // Find monitored signers that are unsigned
       monitoredSigners.forEach((e, i) => {
         if (unsignedValidators.includes(e)) {
           unsignedValidatorsMonitored.push(e);
@@ -70,7 +78,7 @@ export class SignatureChecker {
           unsignedValidatorsMonitored.length > 0
             ? unsignedValidatorsMonitored
             : "None"
-        }}}`
+        }`
       );
 
       this.logger.info(
