@@ -4,7 +4,7 @@ import { ContractKit, newKit } from "@celo/contractkit";
 import winston from "winston";
 import { DatabaseService } from "./Database";
 
-interface votes {
+export interface votes {
   total: string;
   active: string;
   pending: string;
