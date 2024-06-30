@@ -10,7 +10,7 @@ export class DatabaseService {
     this.initialize();
   }
 
-  private async initialize() {
+  public async initialize() {
     await this.pool.query(`
       CREATE TABLE IF NOT EXISTS "group" (
         id SERIAL PRIMARY KEY,
