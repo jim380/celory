@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  repository-projects: read
+  contents: write
+  repository-projects: write
   packages: write
 
 concurrency:
