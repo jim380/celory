@@ -77,3 +77,11 @@ jobs:
 
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          generateReleaseNotes: true
+          body: ${{ steps.changelog.outputs.clean_changelog }}
+          artifacts: ""
